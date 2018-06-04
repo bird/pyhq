@@ -5,7 +5,7 @@ import datetime
 import os
 import time
 from aws_requests_auth.aws_auth import AWSRequestsAuth
-from websocket import create_connection
+from websocket import WebSocketApp, WebSocket
 
 _first_re = re.compile("(.)([A-Z][a-z]+)")
 _cap_re = re.compile("([a-z0-9])([A-Z])")
@@ -75,6 +75,9 @@ class HQClient:
             "user-agent": user_agent
         }
         self.ws = None
+        self.ws_on_message = lambda x: pass
+        self.ws_on_error = lambda x: pass
+        self.ws_on_close = lambda x: pass
         self.caching = caching # probably could just decorate but im too lazy
         self.cache_time = cache_time
         self._cache = {}
@@ -163,16 +166,6 @@ class HQClient:
     def delete_avatar(self) -> str:
         return requests.delete("https://api-quiz.hype.space/users/me/avatarUrl", headers=self.default_headers).json()["avatarUrl"]
 
-    def subscribe(self) -> bool:
-        if self.ws is None:
-            return False
-        x = self.schedule()
-        self.ws.send(json.dumps({
-            "type": "subscribe",
-            "broadcastId": x["broadcast"]["broadcastId"]
-        }))
-        return True
-
     def add_friend(self, something) -> dict:
         if isinstance(something, int):
             user_id = int(something)
@@ -228,15 +221,50 @@ class HQClient:
             user_id = search[0].user_id
         return requests.delete(f"https://api-quiz.hype.space/friends/{user_id}", headers=self.default_headers).json()["result"]
 
-    def connect(self, dont_subscribe: bool=False) -> bool:
+    def connect(self, socket=None) -> bool:
         schedule = self.schedule()
-        if isinstance("broadcast", dict):
-            self.ws = create_connection(schedule["broadcast"]["socketUrl"].replace("https", "wss"))
-            if not dont_subscribe:
-                self.subscribe()
+        m = isinstance(schedule["broadcast"], dict)
+        print(m)
+        if socket is not None or m:
+            if socket is None:
+                self.ws = WebSocketApp(schedule["broadcast"]["socketUrl"].replace("https", "wss"))
+            else:
+                self.ws = WebSocketApp(socket,
+                                       on_message=self.ws_on_message,
+                                       on_error=self.ws_on_error,
+                                       on_close=self.ws_on_close, header=["Authorization: " + self.auth_token])
+            self.wst = __import__("threading").Thread(target=self.ws.run_forever)
+            self.wst.daemon = True
+            self.wst.start()
             return True
         else:
             return False
+
+    def subscribe(self) -> bool:
+        if self.ws is None:
+            return False
+        x = self.schedule()
+        self.ws.send(json.dumps({
+            "type": "subscribe",
+            "broadcastId": x["broadcast"]["broadcastId"]
+        }))
+        return True
+
+    def answer(self, question_id: int, answer_id: int, broadcast_id=None):
+        if self.ws is None:
+            return False
+
+        if broadcast_id is None:
+            x = self.schedule()
+            broadcast_id = x["broadcast"]["broadcastId"]
+
+        self.ws.send(json.dumps({
+            "type": "answer",
+            "questionId": question_id,
+            "broadcastId": broadcast_id,
+            "answerId": answer_id
+        }))
+        return True
 
     def disconnect(self):
         self.ws.close()
@@ -258,7 +286,7 @@ def submit_code(verification_id: str, code: str) -> bool:
 
 
 def username_available(username: str) -> bool:
-    return bool(requests.post("https://api-quiz.hype.space/usernames/available", data={"username": username}).json().keys())
+    return not bool(requests.post("https://api-quiz.hype.space/usernames/available", data={"username": username}).json())
 
 
 def create_user(username: str, verification_id: str, referral: str="", region: str="US"):

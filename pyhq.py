@@ -42,7 +42,7 @@ class HQUserInfo:
         self.blocked = kwargs.get("blocked")
         self.blocks_me = kwargs.get("blocks_me")
         try:
-            x = kwargs2.get("leaderboard")
+            x = kwargs.get("leaderboard")
             if isinstance(x, dict):
                 kwargs2 = {}
                 for k, v in x.items():
@@ -75,7 +75,7 @@ class HQClient:
             "user-agent": user_agent
         }
         self.ws = None
-        self.caching = caching
+        self.caching = caching # probably could just decorate but im too lazy
         self.cache_time = cache_time
         self._cache = {}
 
@@ -94,6 +94,11 @@ class HQClient:
         return requests.post("https://api-quiz.hype.space/easter-eggs/makeItRain", headers=self.default_headers).status_code == 200
 
     def search_users(self, user: str) -> list:
+        if self.caching:
+            if "search_users" in self._cache:
+                if user in self._cache["search_users"]:
+                    if (time.time() - self._cache["search_users"][user]["last_update"]) < self.cache_time:
+                        return self._cache["search_users"][user]["value"]
         response = requests.get("https://api-quiz.hype.space/users?q=" + user, headers=self.default_headers)
         ret = []
         for x in response.json()["data"]:
@@ -101,23 +106,37 @@ class HQClient:
             for k, v in x.items():
                 kwargs[_to_snake(k)] = v
             ret.append(HQUserInfo(**kwargs))
+        if self.caching:
+            if "search_users" not in self._cache:
+                self._cache["search_users"] = {}
+            self._cache["search_users"][user] = {
+                "value": ret,
+                "last_update": time.time()
+            }
         return ret
 
     def user_info(self, something) -> HQUserInfo:
         if isinstance(something, str):
-            search = self.search_users(username)
-            if search:
+            search = self.search_users(something)
+            if not search:
                 raise Exception("User not found")
             else:
                 user_id = search[0].user_id
         elif isinstance(something, int):
             user_id = something
+        if self.caching:
+            if "user_info" in self._cache:
+                if user_id in self._cache["user_info"]:
+                    if (time.time() - self._cache["user_info"][user_id]["last_update"]) < self.cache_time:
+                        return self._cache["user_info"][user_id]["value"]
         response = requests.get("https://api-quiz.hype.space/users/me", headers=self.default_headers)
         kwargs = {}
         for k, v in response.json().items():
             kwargs[_to_snake(k)] = v
         ret = HQUserInfo(**kwargs)
         if self.caching:
+            if "user_info" not in self._cache:
+                self._cache["user_info"] = {}
             self._cache["user_info"][user_id] = {
                 "value": ret,
                 "last_update": time.time()
@@ -159,7 +178,7 @@ class HQClient:
             user_id = int(something)
         elif isinstance(something, str):
             search = self.search_users(something)
-            if search:
+            if not search:
                 raise Exception("user not found")
             user_id = search[0].user_id
         elif isinstance(something, HQUserInfo):
@@ -176,7 +195,7 @@ class HQClient:
             user_id = int(something)
         elif isinstance(something, str):
             search = self.search_users(something)
-            if search:
+            if not search:
                 raise Exception("user not found")
             user_id = search[0].user_id
         return requests.get(f"https://api-quiz.hype.space/friends/{user_id}/status", headers=self.default_headers).json()["status"]
@@ -186,7 +205,7 @@ class HQClient:
             user_id = int(something)
         elif isinstance(something, str):
             search = self.search_users(something)
-            if search:
+            if not search:
                 raise Exception("user not found")
             user_id = search[0].user_id
         response = requests.put(f"https://api-quiz.hype.space/friends/{user_id}/status", headers=self.default_headers, data={
@@ -204,7 +223,7 @@ class HQClient:
             user_id = int(something)
         elif isinstance(something, str):
             search = self.search_users(something)
-            if search:
+            if not search:
                 raise Exception("user not found")
             user_id = search[0].user_id
         return requests.delete(f"https://api-quiz.hype.space/friends/{user_id}", headers=self.default_headers).json()["result"]

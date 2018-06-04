@@ -75,9 +75,9 @@ class HQClient:
             "user-agent": user_agent
         }
         self.ws = None
-        self.ws_on_message = lambda x: pass
-        self.ws_on_error = lambda x: pass
-        self.ws_on_close = lambda x: pass
+        self.ws_on_message = lambda x: None
+        self.ws_on_error = lambda x: None
+        self.ws_on_close = lambda x: None
         self.caching = caching # probably could just decorate but im too lazy
         self.cache_time = cache_time
         self._cache = {}

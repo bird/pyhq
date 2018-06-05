@@ -78,7 +78,7 @@ class HQClient:
         self.ws_on_message = lambda x: None
         self.ws_on_error = lambda x: None
         self.ws_on_close = lambda x: None
-        self.caching = caching # probably could just decorate but im too lazy
+        self.caching = caching  # probably could just decorate but im too lazy
         self.cache_time = cache_time
         self._cache = {}
 
@@ -227,12 +227,15 @@ class HQClient:
         print(m)
         if socket is not None or m:
             if socket is None:
-                self.ws = WebSocketApp(schedule["broadcast"]["socketUrl"].replace("https", "wss"))
+                url = schedule["broadcast"]["socketUrl"]
             else:
-                self.ws = WebSocketApp(socket,
-                                       on_message=self.ws_on_message,
-                                       on_error=self.ws_on_error,
-                                       on_close=self.ws_on_close, header=["Authorization: " + self.auth_token])
+                url = socket[:]
+            url = url.replace("https", "wss")
+            print(url)
+            self.ws = WebSocketApp(url,
+                      on_message=self.ws_on_message,
+                      on_error=self.ws_on_error,
+                      on_close=self.ws_on_close, header=["Authorization: Bearer " + self.auth_token])
             self.wst = __import__("threading").Thread(target=self.ws.run_forever)
             self.wst.daemon = True
             self.wst.start()
@@ -269,6 +272,10 @@ class HQClient:
     def disconnect(self):
         self.ws.close()
         self.ws = None
+
+    def reconnect(self):
+        self.disconnect()
+        self.connect()
 
 
 def verify(phone: str) -> str:

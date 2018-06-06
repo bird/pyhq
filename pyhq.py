@@ -151,7 +151,6 @@ class HQClient:
         kwargs = {}
         for k, v in response.json().items():
             kwargs[_to_snake(k)] = v
-            print(_to_snake(k), v)
         return HQMeInfo(**kwargs)
 
     def cashout(self, paypal: str) -> bool:
@@ -221,61 +220,28 @@ class HQClient:
             user_id = search[0].user_id
         return requests.delete(f"https://api-quiz.hype.space/friends/{user_id}", headers=self.default_headers).json()["result"]
 
-    def connect(self, socket=None) -> bool:
-        schedule = self.schedule()
-        m = isinstance(schedule["broadcast"], dict)
-        print(m)
-        if socket is not None or m:
-            if socket is None:
-                url = schedule["broadcast"]["socketUrl"]
-            else:
-                url = socket[:]
-            url = url.replace("https", "wss")
-            print(url)
-            self.ws = WebSocketApp(url,
-                      on_message=self.ws_on_message,
-                      on_error=self.ws_on_error,
-                      on_close=self.ws_on_close, header=["Authorization: Bearer " + self.auth_token])
-            self.wst = __import__("threading").Thread(target=self.ws.run_forever)
-            self.wst.daemon = True
-            self.wst.start()
-            return True
-        else:
-            return False
-
-    def subscribe(self) -> bool:
-        if self.ws is None:
-            return False
+    def socket_url(self) -> str:
         x = self.schedule()
-        self.ws.send(json.dumps({
+        if x["active"]:
+            return x["broadcast"]["socketUrl"].replace("https", "wss")
+
+    def generate_subscribe(self) -> bool:
+        x = self.schedule()
+        return {
             "type": "subscribe",
             "broadcastId": x["broadcast"]["broadcastId"]
-        }))
-        return True
+        }
 
-    def answer(self, question_id: int, answer_id: int, broadcast_id=None):
-        if self.ws is None:
-            return False
+    def generate_answer(self, question_id: int, answer_id: int):
+        x = self.schedule()
+        broadcast_id = x["broadcast"]["broadcastId"]
 
-        if broadcast_id is None:
-            x = self.schedule()
-            broadcast_id = x["broadcast"]["broadcastId"]
-
-        self.ws.send(json.dumps({
+        return json.dumps({
             "type": "answer",
             "questionId": question_id,
             "broadcastId": broadcast_id,
             "answerId": answer_id
-        }))
-        return True
-
-    def disconnect(self):
-        self.ws.close()
-        self.ws = None
-
-    def reconnect(self):
-        self.disconnect()
-        self.connect()
+        })
 
 
 def verify(phone: str) -> str:

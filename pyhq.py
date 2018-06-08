@@ -157,7 +157,19 @@ class HQClient:
         return requests.post("https://api-quiz.hype.space/users/me/payouts", headers=self.default_headers, data={"email": paypal}).status_code == 200
 
     def schedule(self) -> dict:
-        return requests.get("https://api-quiz.hype.space/shows/now?type=hq", headers=self.default_headers).json()
+        if self.caching:
+            if "schedule" in self._cache:
+                if (time.time() - self._cache["schedule"]["last_update"]) < self.cache_time:
+                    return self._cache["schedule"]
+        ret = requests.get("https://api-quiz.hype.space/shows/now?type=hq", headers=self.default_headers).json()
+        if self.caching:
+            if "schedule" not in self._cache:
+                self._cache["schedule"] = {}
+            self._cache["schedule"] = {
+                "value": ret,
+                "last_update": time.time()
+            }
+        return ret
 
     def aws_credentials(self) -> dict:
         return requests.get("https://api-quiz.hype.space/credentials/s3", headers=self.default_headers).json()
@@ -225,14 +237,14 @@ class HQClient:
         if x["active"]:
             return x["broadcast"]["socketUrl"].replace("https", "wss")
 
-    def generate_subscribe(self) -> bool:
+    def generate_subscribe(self) -> dict:
         x = self.schedule()
         return {
             "type": "subscribe",
             "broadcastId": x["broadcast"]["broadcastId"]
         }
 
-    def generate_answer(self, question_id: int, answer_id: int):
+    def generate_answer(self, question_id: int, answer_id: int) -> dict:
         x = self.schedule()
         broadcast_id = x["broadcast"]["broadcastId"]
 

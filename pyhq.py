@@ -160,7 +160,7 @@ class HQClient:
         if self.caching:
             if "schedule" in self._cache:
                 if (time.time() - self._cache["schedule"]["last_update"]) < self.cache_time:
-                    return self._cache["schedule"]
+                    return self._cache["schedule"]["value"]
         ret = requests.get("https://api-quiz.hype.space/shows/now?type=hq", headers=self.default_headers).json()
         if self.caching:
             if "schedule" not in self._cache:

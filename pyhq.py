@@ -68,7 +68,7 @@ class HQMeInfo(HQUserInfo):
 
 
 class HQClient:
-    def __init__(self, auth_token: str, client: str="Android/1.6.2", user_agent: str="okhttp/3.8.0", caching=False, cache_time=15):
+    def __init__(self, auth_token: str, client: str="Android/1.6.2", user_agent: str="okhttp/3.8.0", caching=False, cache_time=15, no_ws_requests=False):
         self.auth_token = auth_token
         self.headers = {
             "x-hq-client": client,
@@ -81,6 +81,7 @@ class HQClient:
         self.caching = caching  # probably could just decorate but im too lazy
         self.cache_time = cache_time
         self._cache = {}
+        self.no_ws_requests = no_ws_requests
 
     @property
     def default_headers(self) -> dict:
@@ -233,26 +234,48 @@ class HQClient:
         return requests.delete(f"https://api-quiz.hype.space/friends/{user_id}", headers=self.default_headers).json()["result"]
 
     def socket_url(self) -> str:
+        if self.no_ws_requests:
+            return "ws://127.0.0.1:6789"  # tbh just replace the line its one method no args
         x = self.schedule()
         if x["active"]:
             return x["broadcast"]["socketUrl"].replace("https", "wss")
 
-    def generate_subscribe(self) -> dict:
-        x = self.schedule()
-        return {
+    def generate_subscribe(self) -> str:
+        if not self.no_ws_requests:
+            x = self.schedule()
+            broadcast_id = x["broadcast"]["broadcastId"]
+        else:
+            broadcast_id = "placeholder_broadcastid"
+        return json.dumps({
             "type": "subscribe",
-            "broadcastId": x["broadcast"]["broadcastId"]
-        }
+            "broadcastId": broadcast_id
+        })
 
-    def generate_answer(self, question_id: int, answer_id: int) -> dict:
-        x = self.schedule()
-        broadcast_id = x["broadcast"]["broadcastId"]
+    def generate_answer(self, question_id: int, answer_id: int) -> str:
+        if not self.no_ws_requests:
+            x = self.schedule()
+            broadcast_id = x["broadcast"]["broadcastId"]
+        else:
+            broadcast_id = "placeholder_broadcastid"
 
         return json.dumps({
             "type": "answer",
             "questionId": question_id,
             "broadcastId": broadcast_id,
             "answerId": answer_id
+        })
+
+    def generate_extra_life(self, question_id: int) -> str:
+        if not self.no_ws_requests:
+            x = self.schedule()
+            broadcast_id = x["broadcast"]["broadcastId"]
+        else:
+            broadcast_id = "placeholder_broadcastid"
+
+        return json.dumps({
+            "type": "useExtraLife",
+            "broadcastId": broadcast_id,
+            "questionId": question_id
         })
 
 

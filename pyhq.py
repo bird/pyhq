@@ -5,7 +5,6 @@ import datetime
 import os
 import time
 from aws_requests_auth.aws_auth import AWSRequestsAuth
-from websocket import WebSocketApp, WebSocket
 
 _first_re = re.compile("(.)([A-Z][a-z]+)")
 _cap_re = re.compile("([a-z0-9])([A-Z])")

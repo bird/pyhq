@@ -287,8 +287,8 @@ def verify(phone: str) -> str:
         raise Exception("invalid phone number")
 
 
-def submit_code(verification_id: str, code: str) -> bool:
-    return requests.post("https://api-quiz.hype.space/verifications/" + verification_id, data={"code": code}).status_code != 404
+def submit_code(verification_id: str, code: str) -> dict:
+    return requests.post("https://api-quiz.hype.space/verifications/" + verification_id, data={"code": code}).json()
 
 
 def username_available(username: str) -> bool:

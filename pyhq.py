@@ -1,4 +1,4 @@
-import json
+    import json
 import requests
 import re
 import datetime
@@ -295,10 +295,10 @@ def username_available(username: str) -> bool:
     return not bool(requests.post("https://api-quiz.hype.space/usernames/available", data={"username": username}).json())
 
 
-def create_user(username: str, verification_id: str, referral: str="", region: str="US"):
+def create_user(username: str, verification_id: str, referral: str="", region: str="US", language: str="en"):
     return requests.post("https://api-quiz.hype.space/users", data={
-        "country": "US",
-        "language": "en",
+        "country": region,
+        "language": language,
         "referringUsername": referral,
         "username": username,
         "verificationId": verification_id

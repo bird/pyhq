@@ -4,6 +4,7 @@ import re
 import datetime
 import os
 import time
+from typing import Union
 
 _first_re = re.compile("(.)([A-Z][a-z]+)")
 _cap_re = re.compile("([a-z0-9])([A-Z])")
@@ -63,6 +64,50 @@ class HQMeInfo(HQUserInfo):
         self.lives = kwargs.get("lives")
         self.phone_number = kwargs.get("phone_number")
         self.referred = kwargs.get("referred")
+
+
+class HQBalanceInfo:
+    def __init__(self, **kwargs):
+        self.prize_total = kwargs.get("prize_total") # "$123.45"
+        self.paid = kwargs.get("paid") # "$123.45"
+        self.pending = kwargs.get("pending") # "$123.45"
+        self.unpaid = kwargs.get("unpaid") # same thing, current balance
+        self.eligible_for_payout = kwargs.get("eligible_for_payout") # bool
+        self.has_pending = kwargs.get("has_pending") # bool
+        self.payouts_connected = kwargs.get("payouts_connected") # bool
+        self.payouts_email = kwargs.get("payouts_email") # first used email
+        self.document_required = kwargs.get("document_required") # bool
+        self.document_status = kwargs.get("document_status") # str
+
+
+class HQPayout:
+    def __init__(self, **kwargs):
+        self.payout_id = kwargs.get("payout_id") # int
+        self.user_id = kwargs.get("user_id") # int
+        self.amount = kwargs.get("amount") # "$123.45"
+        self.currency = kwargs.get("currency") # "USD"
+        self.target_user_id = kwargs.get("target_user_id") # ?
+        self.target_email = kwargs.get("target_email") # email to withdraw
+        self.target_phone = kwargs.get("target_phone") # ?
+        self.status = kwargs.get("status") # 10001 if succeeded?
+        _md = kwargs.get("metadata")
+        self.metadata = {
+            "payouts_connected": _md["payoutsConnected"],
+            "client": _md["client"],
+            "sender_batch_id": _md["senderBatchId"],
+            "batchId": _md["batchId"]
+        }
+        self.created = kwargs.get("created") # button hit, YYYY-MM-DDTHH:MM:SS.000Z
+        self.modified = kwargs.get("modified") # successful, same format
+
+
+class HQPayoutInfo:
+    def __init__(self, **kwargs):
+        self.balance = HQBalanceInfo(**(kwargs.get("balance")))
+        self.payouts = []
+
+        for payout in kwargs.get("payouts", []):
+            self.payouts.append(HQPayout(**payout))
 
 
 class HQClient:
@@ -152,8 +197,16 @@ class HQClient:
             kwargs[_to_snake(k)] = v
         return HQMeInfo(**kwargs)
 
-    def cashout(self, paypal: str) -> bool:
-        return requests.post("https://api-quiz.hype.space/users/me/payouts", headers=self.default_headers, data={"email": paypal}).status_code == 200
+    # i actually dont know if this works so please forgive me if it doesnt lol
+    def cashout(self, paypal: str) -> Union[HQPayout, dict]:
+        response = requests.post("https://api-quiz.hype.space/users/me/payouts", headers=self.default_headers, data={"email": paypal}).json()
+        if "errorCode" in response:
+            return response
+        else:
+            kwargs = {}
+            for k, v in response["data"].items():
+                kwargs[_to_snake(k)] = v
+            return HQPayout(**kwargs)
 
     def schedule(self) -> dict:
         if self.caching:
@@ -230,6 +283,20 @@ class HQClient:
                 raise Exception("user not found")
             user_id = search[0].user_id
         return requests.delete(f"https://api-quiz.hype.space/friends/{user_id}", headers=self.default_headers).json()["result"]
+
+    def payouts(self) -> HQPayoutInfo:
+        response = requests.get("https://api-quiz.hype.space/users/me/payouts", headers=self.default_headers).json()
+        kwargs = {}
+        for k, v in response.items():
+            kwargs[_to_snake(k)] = v
+        for k, v in response["balance"].copy().items():
+            kwargs["balance"][_to_snake(k)] = v
+        for i, x in enumerate(kwargs["payouts"]):
+            d = {}
+            for k, v in x.items():
+                d[_to_snake(k)] = v
+            kwargs["payouts"][i] = d
+        return HQPayoutInfo(**kwargs)
 
     def socket_url(self) -> str:
         if self.no_ws_requests:

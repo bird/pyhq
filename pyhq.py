@@ -40,6 +40,7 @@ class HQUserInfo:
         self.win_count = kwargs.get("win_count") # different than leaderboard.alltime_wins cuz i dont know, i think this is the accurate one
         self.blocked = kwargs.get("blocked")
         self.blocks_me = kwargs.get("blocks_me")
+        self.achievement_count = kwargs.get("achievement_count") # int
         try:
             x = kwargs.get("leaderboard")
             if isinstance(x, dict):
@@ -64,7 +65,7 @@ class HQMeInfo(HQUserInfo):
         self.lives = kwargs.get("lives")
         self.phone_number = kwargs.get("phone_number")
         self.referred = kwargs.get("referred")
-
+        self.streak_info = kwargs.get("streak_info") # no class until purpose is clear
 
 class HQBalanceInfo:
     def __init__(self, **kwargs):
@@ -92,10 +93,10 @@ class HQPayout:
         self.status = kwargs.get("status") # 10001 if succeeded?
         _md = kwargs.get("metadata")
         self.metadata = {
-            "payouts_connected": _md["payoutsConnected"],
-            "client": _md["client"],
-            "sender_batch_id": _md["senderBatchId"],
-            "batchId": _md["batchId"]
+            "payouts_connected": _md.get("payoutsConnected"),
+            "client": _md.get("client"),
+            "sender_batch_id": _md.get("senderBatchId"),
+            "batchId": _md.get("batchId")
         }
         self.created = kwargs.get("created") # button hit, YYYY-MM-DDTHH:MM:SS.000Z
         self.modified = kwargs.get("modified") # successful, same format

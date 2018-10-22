@@ -209,6 +209,9 @@ class HQClient:
                 kwargs[_to_snake(k)] = v
             return HQPayout(**kwargs)
 
+    def addReferral(self, referral: str) -> bool:
+        return requests.patch("https://api-quiz.hype.space/users/me", headers=self.default_headers, data={"referringUsername": referral}).status_code == 200
+
     def schedule(self) -> dict:
         if self.caching:
             if "schedule" in self._cache:

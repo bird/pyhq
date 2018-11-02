@@ -112,12 +112,13 @@ class HQPayoutInfo:
 
 
 class HQClient:
-    def __init__(self, auth_token: str, client: str="Android/1.6.2", user_agent: str="okhttp/3.8.0", caching=False, cache_time=15, no_ws_requests=False):
-        self.auth_token = auth_token
+    def __init__(self, login_token: str, client: str="Android/1.6.2", user_agent: str="okhttp/3.8.0", caching=False, cache_time=15, no_ws_requests=False):
+        self.login_token = login_token
         self.headers = {
             "x-hq-client": client,
             "user-agent": user_agent
         }
+        self.auth_token = self.get_auth_token()
         self.ws = None
         self.ws_on_message = lambda x: None
         self.ws_on_error = lambda x: None
@@ -134,6 +135,9 @@ class HQClient:
             "authorization": "Bearer " + self.auth_token,
             "user-agent": self.headers["user-agent"]
         }
+
+    def get_auth_token(self) -> str:
+        return requests.post("https://api-quiz.hype.space/tokens/", headers=self.headers, data={'token': self.login_token}).json()['authToken']
 
     def valid_auth(self) -> bool:
         return "active" in self.schedule()
